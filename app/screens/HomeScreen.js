@@ -1,46 +1,77 @@
 import React, { useContext, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { AuthContext } from '../contexts/AuthContext';
 
 export default function HomeScreen({ navigation }) {
+  const { user, logout } = useContext(AuthContext);
+
+  // Menu items - desabilitados os que ainda não têm tela
   const menuItems = [
-    { label: 'Dashboard', screen: 'Dashboard' },
-    { label: 'Amostras', screen: 'Amostras' },
-    { label: 'Análises', screen: 'Analises' },
-    { label: 'Laudos', screen: 'Laudos' },
-    { label: 'Usuários', screen: 'Usuarios' },
-    { label: 'Parâmetros', screen: 'Parametros' },
-    { label: 'Revisar Laudos', screen: 'RevisarLaudos' },
+    { label: 'Dashboard', screen: 'Dashboard', enabled: true },
+    { label: 'Amostras', screen: 'Amostras', enabled: true },
+    { label: 'Análises', screen: 'Analises', enabled: true },
+    { label: 'Laudos', screen: 'Laudos', enabled: true },
+    { label: 'Usuários', screen: 'Usuarios', enabled: false },
+    { label: 'Parâmetros', screen: 'Parametros', enabled: false },
+    { label: 'Revisar Laudos', screen: 'RevisarLaudos', enabled: false },
   ];
 
-  const { user, logout } = useContext(AuthContext); // aqui o hook que faltava
   useEffect(() => {
     if (!user) {
       navigation.replace('Login');
     }
-  }, [user]);  
+  }, [user]);
+
+  const handleMenuPress = (item) => {
+    if (item.enabled) {
+      navigation.navigate(item.screen);
+    } else {
+      Alert.alert(
+        'Em Desenvolvimento',
+        `A tela "${item.label}" ainda não está disponível.`,
+        [{ text: 'OK' }]
+      );
+    }
+  };
 
   return (
     <View style={{ flex: 1 }}>
       <View style={styles.header}>
-        <Text style={styles.welcome}>Bem-vindo, {user?.email}</Text>
-        <TouchableOpacity onPress={async () => {
-          await logout();
-          navigation.replace('Login');
-        }} style={styles.logoutBtn}>
+        <View>
+          <Text style={styles.welcome}>Bem-vindo!</Text>
+          <Text style={styles.email}>{user?.email}</Text>
+        </View>
+        <TouchableOpacity 
+          onPress={async () => {
+            await logout();
+            navigation.replace('Login');
+          }} 
+          style={styles.logoutBtn}
+        >
           <Text style={styles.logoutText}>Sair</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.container}>
         <Text style={styles.title}>AQMel APP</Text>
+        <Text style={styles.subtitle}>Sistema de Gestão de Análises de Mel</Text>
+        
         {menuItems.map((item, index) => (
           <TouchableOpacity
             key={index}
-            style={styles.button}
-            onPress={() => navigation.navigate(item.screen)}
+            style={[
+              styles.button,
+              !item.enabled && styles.buttonDisabled
+            ]}
+            onPress={() => handleMenuPress(item)}
           >
-            <Text style={styles.buttonText}>{item.label}</Text>
+            <Text style={[
+              styles.buttonText,
+              !item.enabled && styles.buttonTextDisabled
+            ]}>
+              {item.label}
+              {!item.enabled && ' (Em breve)'}
+            </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -64,10 +95,16 @@ const styles = StyleSheet.create({
   welcome: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#333',
+  },
+  email: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
   },
   logoutBtn: {
-    paddingVertical: 5,
-    paddingHorizontal: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
     backgroundColor: '#CBB26A',
     borderRadius: 8,
   },
@@ -76,10 +113,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   title: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: 5,
     color: '#CBB26A',
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 25,
   },
   button: {
     padding: 15,
@@ -87,9 +129,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#CBB26A',
     marginBottom: 15,
   },
+  buttonDisabled: {
+    backgroundColor: '#D3D3D3',
+  },
   buttonText: {
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  buttonTextDisabled: {
+    color: '#888',
   },
 });

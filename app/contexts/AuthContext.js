@@ -11,9 +11,23 @@ export const AuthProvider = ({ children }) => {
     const loadUser = async () => {
       try {
         const storedUser = await AsyncStorage.getItem('@user');
-        if (storedUser) setUser(JSON.parse(storedUser));
+        if (storedUser) {
+          const parsedUser = JSON.parse(storedUser);
+          
+          // Verificando se parsedUser é um objeto válido
+          if (typeof parsedUser === 'object' && parsedUser !== null) {
+            console.log('User loaded from AsyncStorage:', parsedUser); // Log para verificação
+            setUser(parsedUser);
+          } else {
+            console.log('User data is invalid:', parsedUser);
+            setUser(null);
+          }
+        } else {
+          setUser(null);
+        }
       } catch (e) {
         console.log('Erro ao carregar user:', e);
+        setUser(null); // Em caso de erro ao carregar, limpamos o estado do user
       } finally {
         setLoading(false);
       }
@@ -22,8 +36,13 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (userData) => {
-    setUser(userData);
-    await AsyncStorage.setItem('@user', JSON.stringify(userData));
+    // Verificando se userData é um objeto válido antes de armazenar
+    if (typeof userData === 'object' && userData !== null) {
+      await AsyncStorage.setItem('@user', JSON.stringify(userData));
+      setUser(userData);
+    } else {
+      console.error('Invalid user data:', userData);
+    }
   };
 
   const logout = async () => {
