@@ -4,7 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import HomeScreen from './screens/HomeScreen';
-import DashboardScreen from './screens/DashboardScreen';
+//import DashboardScreen from './screens/DashboardScreen';
 import AmostrasScreen from './screens/AmostrasScreen';
 import AnalisesScreen from './screens/AnalisesScreen';
 import LaudosScreen from './screens/LaudosScreen';
@@ -19,7 +19,6 @@ export default function App() {
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Register" component={RegisterScreen} />
           <Stack.Screen name="Home" component={HomeScreen} />
-          <Stack.Screen name="Dashboard" component={DashboardScreen} />
           <Stack.Screen name="Amostras" component={AmostrasScreen} />
           <Stack.Screen name="Analises" component={AnalisesScreen} />
           <Stack.Screen name="Laudos" component={LaudosScreen} />
@@ -31,6 +30,7 @@ export default function App() {
 
 //add quando tiver outras telas:
 /*
+<Stack.Screen name="Dashboard" component={DashboardScreen} />
 <Stack.Screen name="Dashboard" component={DashboardScreen} />
 <Stack.Screen name="Amostras" component={AmostrasScreen} />
 <Stack.Screen name="Analises" component={AnalisesScreen} />

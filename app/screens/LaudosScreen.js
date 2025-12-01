@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert, ActivityIndicator } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
 import LaudosModal from '../modals/LaudosModal';
+import { criarLaudo, buscarLaudos, deletarLaudo } from '../services/laudosService';
 
 export default function LaudosScreen() {
   const [search, setSearch] = useState('');
@@ -10,33 +11,98 @@ export default function LaudosScreen() {
   const [statusFiltro, setStatusFiltro] = useState('');
   const [dataFiltro, setDataFiltro] = useState(null);
   const [showDataPicker, setShowDataPicker] = useState(false);
+  const [laudos, setLaudos] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const [laudos, setLaudos] = useState([
-    { id: '1', codigo: 'LD-2024-0038', analise: 'AN-2024-0042', tipo: 'Físico-Químico', data: '15/06/2024', status: 'EMITIDO' },
-    { id: '2', codigo: 'LD-2024-0039', analise: 'AN-2024-0043', tipo: 'Microbiológico', data: '16/06/2024', status: 'PENDENTE' },
-    { id: '3', codigo: 'LD-2024-0040', analise: 'AN-2024-0044', tipo: 'Completo', data: '17/06/2024', status: 'PENDENTE' },
-  ]);
+  useEffect(() => {
+    carregarLaudos();
+  }, []);
+
+  const carregarLaudos = async () => {
+    try {
+      setLoading(true);
+      const dados = await buscarLaudos();
+      setLaudos(dados);
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível carregar os laudos');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSalvarLaudo = async (novoLaudo) => {
+    try {
+      const laudoCriado = await criarLaudo(novoLaudo);
+      setLaudos(prev => [laudoCriado, ...prev]);
+      Alert.alert('Sucesso', 'Laudo cadastrado com sucesso!');
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível salvar o laudo');
+      console.error(error);
+    }
+  };
+
+  const handleDeletarLaudo = (id, codigo) => {
+    Alert.alert(
+      'Confirmar exclusão',
+      `Deseja realmente excluir o laudo ${codigo}?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deletarLaudo(id);
+              setLaudos(prev => prev.filter(l => l.id !== id));
+              Alert.alert('Sucesso', 'Laudo excluído com sucesso!');
+            } catch (error) {
+              Alert.alert('Erro', 'Não foi possível excluir o laudo');
+              console.error(error);
+            }
+          }
+        }
+      ]
+    );
+  };
 
   const estatisticas = [
     { label: 'Laudos Hoje', valor: 8, detalhe: '+15% que ontem' },
-    { label: 'Pendentes', valor: 5, detalhe: '-2% que semana passada' },
-    { label: 'Emitidos', valor: 42, detalhe: '+30% que mês passado' },
+    { label: 'Pendentes', valor: laudos.filter(l => l.status === 'PENDENTE').length, detalhe: '-2% que semana passada' },
+    { label: 'Emitidos', valor: laudos.filter(l => l.status === 'EMITIDO').length, detalhe: '+30% que mês passado' },
   ];
 
   const renderLaudo = ({ item }) => (
     <View style={styles.row}>
-      <Text style={[styles.cell, { flex: 1.3, fontWeight: 'bold' }]}>{item.codigo}</Text>
-      <Text style={[styles.cell, { flex: 1.3 }]}>{item.analise}</Text>
-      <Text style={[styles.cell, { flex: 1.1 }]}>{item.tipo}</Text>
-      <Text style={[styles.cell, { flex: 1 }]}>{item.data}</Text>
-      <Text style={[
-        styles.cell,
-        item.status === 'EMITIDO' ? styles.statusEmitido : styles.statusPendente
-      ]}>
-        {item.status}
-      </Text>
+      <View style={{ flex: 5 }}>
+        <Text style={styles.cellCodigo}>{item.codigo}</Text>
+        <Text style={styles.cell}>Análise: {item.analise}</Text>
+        <Text style={styles.cell}>Tipo: {item.tipo}</Text>
+        <Text style={styles.cell}>Data: {item.data}</Text>
+        <Text style={[
+          styles.cell,
+          item.status === 'EMITIDO' ? styles.statusEmitido : styles.statusPendente
+        ]}>
+          {item.status}
+        </Text>
+      </View>
+      <TouchableOpacity 
+        style={styles.deleteBtn}
+        onPress={() => handleDeletarLaudo(item.id, item.codigo)}
+      >
+        <Text style={styles.deleteText}>🗑️</Text>
+      </TouchableOpacity>
     </View>
   );
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#CBB26A" />
+        <Text style={{ marginTop: 10 }}>Carregando laudos...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -71,21 +137,6 @@ export default function LaudosScreen() {
           </Picker>
         </View>
 
-        <TouchableOpacity style={[styles.dateInput, { flexBasis: '25%' }]} onPress={() => setShowDataPicker(true)}>
-          <Text>{dataFiltro ? dataFiltro.toLocaleDateString('pt-BR') : 'dd/mm/aaaa'}</Text>
-        </TouchableOpacity>
-        {showDataPicker && (
-          <DateTimePicker
-            value={dataFiltro || new Date()}
-            mode="date"
-            display="default"
-            onChange={(event, selectedDate) => {
-              setShowDataPicker(false);
-              if (selectedDate) setDataFiltro(selectedDate);
-            }}
-          />
-        )}
-
         <TouchableOpacity style={styles.newBtn} onPress={() => setModalVisible(true)}>
           <Text style={styles.newBtnText}>+ Novo</Text>
         </TouchableOpacity>
@@ -107,12 +158,7 @@ export default function LaudosScreen() {
       <LaudosModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
-        onSave={(novoLaudo) => {
-          setLaudos(prev => [
-            { id: String(prev.length + 1), ...novoLaudo },
-            ...prev
-          ]);
-        }}
+        onSave={handleSalvarLaudo}
       />
     </View>
   );
@@ -130,12 +176,14 @@ const styles = StyleSheet.create({
   filterContainer: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 },
   input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 10, paddingHorizontal: 10, height: 40, backgroundColor: '#fff', marginRight: 10 },
   picker: { borderWidth: 1, borderColor: '#ccc', borderRadius: 10, backgroundColor: '#fff', height: 40, justifyContent: 'center', marginRight: 10 },
-  dateInput: { borderWidth: 1, borderColor: '#ccc', borderRadius: 10, backgroundColor: '#fff', paddingHorizontal: 10, height: 40, justifyContent: 'center', marginRight: 10 },
   newBtn: { backgroundColor: '#CBB26A', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 10 },
   newBtnText: { color: '#fff', fontWeight: 'bold' },
   sectionTitle: { fontSize: 18, fontWeight: '600', marginVertical: 10 },
-  row: { flexDirection: 'row', padding: 10, backgroundColor: '#fff', borderRadius: 8, marginBottom: 10, elevation: 1 },
-  cell: { fontSize: 13, flex: 1 },
+  row: { flexDirection: 'row', padding: 10, backgroundColor: '#fff', borderRadius: 8, marginBottom: 10, elevation: 1, alignItems: 'center' },
+  cellCodigo: { fontWeight: 'bold', fontSize: 14 },
+  cell: { fontSize: 13, marginTop: 3 },
   statusEmitido: { color: 'green', fontWeight: 'bold' },
   statusPendente: { color: 'orange', fontWeight: 'bold' },
+  deleteBtn: { padding: 10 },
+  deleteText: { fontSize: 20 },
 });

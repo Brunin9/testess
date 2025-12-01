@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert, ActivityIndicator } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
 import AnalisesModal from '../modals/AnalisesModal';
+import { criarAnalise, buscarAnalises, deletarAnalise } from '../services/analisesService';
 
 export default function AnalisesScreen() {
   const [search, setSearch] = useState('');
@@ -13,28 +14,85 @@ export default function AnalisesScreen() {
   const [dataFim, setDataFim] = useState(null);
   const [showInicio, setShowInicio] = useState(false);
   const [showFim, setShowFim] = useState(false);
+  const [analises, setAnalises] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const [analises, setAnalises] = useState([
-    { id: '1', codigo: 'AN-2024-0001', amostra: 'AM-2024-0015', tipo: 'Físico-química', responsavel: 'Maria Silva', data: '15/06/2024', status: 'CONCLUÍDA' },
-    { id: '2', codigo: 'AN-2024-0002', amostra: 'AM-2024-0016', tipo: 'Microbiológica', responsavel: 'João Pereira', data: '20/06/2024', status: 'PENDENTE' },
-  ]);
+  useEffect(() => {
+    carregarAnalises();
+  }, []);
+
+  const carregarAnalises = async () => {
+    try {
+      setLoading(true);
+      const dados = await buscarAnalises();
+      setAnalises(dados);
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível carregar as análises');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSalvarAnalise = async (novaAnalise) => {
+    try {
+      const analiseCriada = await criarAnalise(novaAnalise);
+      setAnalises(prev => [analiseCriada, ...prev]);
+      Alert.alert('Sucesso', 'Análise cadastrada com sucesso!');
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível salvar a análise');
+      console.error(error);
+    }
+  };
+
+  const handleDeletarAnalise = (id, codigo) => {
+    Alert.alert(
+      'Confirmar exclusão',
+      `Deseja realmente excluir a análise ${codigo}?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deletarAnalise(id);
+              setAnalises(prev => prev.filter(a => a.id !== id));
+              Alert.alert('Sucesso', 'Análise excluída com sucesso!');
+            } catch (error) {
+              Alert.alert('Erro', 'Não foi possível excluir a análise');
+              console.error(error);
+            }
+          }
+        }
+      ]
+    );
+  };
 
   const estatisticas = [
     { label: 'Análises Hoje', valor: 15, detalhe: '+8% que ontem' },
-    { label: 'Pendentes', valor: 18, detalhe: '-3% que semana passada' },
-    { label: 'Concluídas', valor: 42, detalhe: '+25% que mês passado' },
+    { label: 'Pendentes', valor: analises.filter(a => a.status === 'PENDENTE').length, detalhe: '-3% que semana passada' },
+    { label: 'Concluídas', valor: analises.filter(a => a.status === 'CONCLUÍDA').length, detalhe: '+25% que mês passado' },
   ];
 
   const renderAnalise = ({ item }) => (
     <View style={styles.row}>
-      <Text style={styles.cellCodigo}>{item.codigo}</Text>
-      <Text style={styles.cell}>{item.amostra}</Text>
-      <Text style={styles.cell}>{item.tipo}</Text>
-      <Text style={styles.cell}>{item.responsavel}</Text>
-      <Text style={styles.cell}>{item.data}</Text>
-      <Text style={[styles.cell, item.status === 'CONCLUÍDA' ? styles.statusConcluida : styles.statusPendente]}>
-        {item.status}
-      </Text>
+      <View style={{ flex: 5 }}>
+        <Text style={styles.cellCodigo}>{item.codigo}</Text>
+        <Text style={styles.cell}>Amostra: {item.amostra}</Text>
+        <Text style={styles.cell}>Tipo: {item.tipo}</Text>
+        <Text style={styles.cell}>Responsável: {item.responsavel}</Text>
+        <Text style={styles.cell}>Data: {item.data}</Text>
+        <Text style={[styles.cell, item.status === 'CONCLUÍDA' ? styles.statusConcluida : styles.statusPendente]}>
+          {item.status}
+        </Text>
+      </View>
+      <TouchableOpacity 
+        style={styles.deleteBtn}
+        onPress={() => handleDeletarAnalise(item.id, item.codigo)}
+      >
+        <Text style={styles.deleteText}>🗑️</Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -45,6 +103,15 @@ export default function AnalisesScreen() {
     setDataInicio(null);
     setDataFim(null);
   };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#CBB26A" />
+        <Text style={{ marginTop: 10 }}>Carregando análises...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -85,37 +152,6 @@ export default function AnalisesScreen() {
           </Picker>
         </View>
 
-        {/* Datas */}
-        <TouchableOpacity style={styles.dateInput} onPress={() => setShowInicio(true)}>
-          <Text>{dataInicio ? dataInicio.toLocaleDateString('pt-BR') : 'Data início'}</Text>
-        </TouchableOpacity>
-        {showInicio && (
-          <DateTimePicker
-            value={dataInicio || new Date()}
-            mode="date"
-            display="default"
-            onChange={(event, selected) => {
-              setShowInicio(false);
-              if (selected) setDataInicio(selected);
-            }}
-          />
-        )}
-
-        <TouchableOpacity style={styles.dateInput} onPress={() => setShowFim(true)}>
-          <Text>{dataFim ? dataFim.toLocaleDateString('pt-BR') : 'Data fim'}</Text>
-        </TouchableOpacity>
-        {showFim && (
-          <DateTimePicker
-            value={dataFim || new Date()}
-            mode="date"
-            display="default"
-            onChange={(event, selected) => {
-              setShowFim(false);
-              if (selected) setDataFim(selected);
-            }}
-          />
-        )}
-
         <TouchableOpacity style={styles.newBtn} onPress={() => setModalVisible(true)}>
           <Text style={styles.newBtnText}>+ Nova</Text>
         </TouchableOpacity>
@@ -143,12 +179,7 @@ export default function AnalisesScreen() {
       <AnalisesModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
-        onSave={(novaAnalise) => {
-          setAnalises(prev => [
-            { id: String(prev.length + 1), ...novaAnalise },
-            ...prev
-          ]);
-        }}
+        onSave={handleSalvarAnalise}
       />
     </View>
   );
@@ -166,15 +197,16 @@ const styles = StyleSheet.create({
   filterContainer: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 },
   searchInput: { borderWidth: 1, borderColor: '#ccc', borderRadius: 10, paddingHorizontal: 10, height: 40, backgroundColor: '#fff', flex: 1, marginRight: 10 },
   picker: { borderWidth: 1, borderColor: '#ccc', borderRadius: 10, backgroundColor: '#fff', marginRight: 10, height: 40, justifyContent: 'center', flexBasis: '30%' },
-  dateInput: { borderWidth: 1, borderColor: '#ccc', borderRadius: 10, backgroundColor: '#fff', paddingHorizontal: 10, height: 40, justifyContent: 'center', marginRight: 10 },
   newBtn: { backgroundColor: '#CBB26A', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 10 },
   newBtnText: { color: '#fff', fontWeight: 'bold' },
   clearBtn: { alignSelf: 'flex-start', marginBottom: 10 },
   clearText: { color: '#444', fontWeight: '600' },
   sectionTitle: { fontSize: 18, fontWeight: '600', marginVertical: 10 },
-  row: { flexDirection: 'row', padding: 10, backgroundColor: '#fff', borderRadius: 8, marginBottom: 10, elevation: 1 },
-  cellCodigo: { flex: 1.2, fontWeight: 'bold' },
-  cell: { flex: 1, fontSize: 13 },
+  row: { flexDirection: 'row', padding: 10, backgroundColor: '#fff', borderRadius: 8, marginBottom: 10, elevation: 1, alignItems: 'center' },
+  cellCodigo: { fontWeight: 'bold', fontSize: 14 },
+  cell: { fontSize: 13, marginTop: 3 },
   statusConcluida: { color: 'green', fontWeight: 'bold' },
   statusPendente: { color: 'red', fontWeight: 'bold' },
+  deleteBtn: { padding: 10 },
+  deleteText: { fontSize: 20 },
 });

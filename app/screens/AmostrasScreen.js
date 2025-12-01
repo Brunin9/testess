@@ -1,15 +1,66 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert, ActivityIndicator } from 'react-native';
 import AmostrasModal from '../modals/AmostrasModal';
+import { criarAmostra, buscarAmostras, deletarAmostra } from '../services/amostrasService';
 
 export default function AmostrasScreen() {
   const [search, setSearch] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
+  const [amostras, setAmostras] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const [amostras, setAmostras] = useState([
-    { id: '1', codigo: 'AM-2024-0015', origem: 'São Paulo - SP\nProdutor: Fazenda do Mel', cultura: 'Apicultura', data: '15/06/2024', status: 'CONCLUÍDA' },
-    { id: '2', codigo: 'AM-2024-0016', origem: 'Minas Gerais - MG\nProdutor: Apiários do Brasil', cultura: 'Apicultura', data: '18/06/2024', status: 'PENDENTE' },
-  ]);
+  // Carregar amostras ao iniciar
+  useEffect(() => {
+    carregarAmostras();
+  }, []);
+
+  const carregarAmostras = async () => {
+    try {
+      setLoading(true);
+      const dados = await buscarAmostras();
+      setAmostras(dados);
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível carregar as amostras');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSalvarAmostra = async (novaAmostra) => {
+    try {
+      const amostraCriada = await criarAmostra(novaAmostra);
+      setAmostras(prev => [amostraCriada, ...prev]);
+      Alert.alert('Sucesso', 'Amostra cadastrada com sucesso!');
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível salvar a amostra');
+      console.error(error);
+    }
+  };
+
+  const handleDeletarAmostra = (id, codigo) => {
+    Alert.alert(
+      'Confirmar exclusão',
+      `Deseja realmente excluir a amostra ${codigo}?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deletarAmostra(id);
+              setAmostras(prev => prev.filter(a => a.id !== id));
+              Alert.alert('Sucesso', 'Amostra excluída com sucesso!');
+            } catch (error) {
+              Alert.alert('Erro', 'Não foi possível excluir a amostra');
+              console.error(error);
+            }
+          }
+        }
+      ]
+    );
+  };
 
   const estatisticas = [
     { label: 'Total de Amostras', valor: amostras.length, detalhe: '+24% que mês passado' },
@@ -19,15 +70,32 @@ export default function AmostrasScreen() {
 
   const renderAmostra = ({ item }) => (
     <View style={styles.row}>
-      <Text style={styles.cellCodigo}>{item.codigo}</Text>
-      <Text style={styles.cell}>{item.origem}</Text>
-      <Text style={styles.cell}>{item.cultura}</Text>
-      <Text style={styles.cell}>{item.data}</Text>
-      <Text style={[styles.cell, item.status === 'CONCLUÍDA' ? styles.statusConcluida : styles.statusPendente]}>
-        {item.status}
-      </Text>
+      <View style={{ flex: 4 }}>
+        <Text style={styles.cellCodigo}>{item.codigo}</Text>
+        <Text style={styles.cell}>{item.origem}</Text>
+        <Text style={styles.cell}>{item.cultura}</Text>
+        <Text style={styles.cell}>{item.dataColeta}</Text>
+        <Text style={[styles.cell, item.status === 'CONCLUÍDA' ? styles.statusConcluida : styles.statusPendente]}>
+          {item.status}
+        </Text>
+      </View>
+      <TouchableOpacity 
+        style={styles.deleteBtn}
+        onPress={() => handleDeletarAmostra(item.id, item.codigo)}
+      >
+        <Text style={styles.deleteText}>🗑️</Text>
+      </TouchableOpacity>
     </View>
   );
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#CBB26A" />
+        <Text style={{ marginTop: 10 }}>Carregando amostras...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -74,12 +142,7 @@ export default function AmostrasScreen() {
       <AmostrasModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
-        onSave={(novaAmostra) => {
-          setAmostras(prev => [
-            { id: String(prev.length + 1), ...novaAmostra },
-            ...prev
-          ]);
-        }}
+        onSave={handleSalvarAmostra}
       />
     </View>
   );
@@ -103,9 +166,12 @@ const styles = StyleSheet.create({
 
   sectionTitle: { fontSize: 18, fontWeight: '600', marginVertical: 10 },
 
-  row: { flexDirection: 'row', padding: 10, backgroundColor: '#fff', borderRadius: 8, marginBottom: 10, elevation: 1 },
-  cellCodigo: { flex: 1.2, fontWeight: 'bold' },
-  cell: { flex: 1, fontSize: 13 },
+  row: { flexDirection: 'row', padding: 10, backgroundColor: '#fff', borderRadius: 8, marginBottom: 10, elevation: 1, alignItems: 'center' },
+  cellCodigo: { fontWeight: 'bold', fontSize: 14 },
+  cell: { fontSize: 13, marginTop: 3 },
   statusConcluida: { color: 'green', fontWeight: 'bold' },
   statusPendente: { color: 'red', fontWeight: 'bold' },
+  
+  deleteBtn: { padding: 10 },
+  deleteText: { fontSize: 20 },
 });
